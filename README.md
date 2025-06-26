@@ -87,3 +87,17 @@ response:
 }
 ```
 
+## Usage
+
+Best friend for a web service is a JavaScript client, but if you are on a shell ```curl``` is a great alternative
+
+```bash
+curl --header "Content-Type: application/json"  --request POST --data '{"command": "power", "ports": [0,1,2,3,4,5], "value": 1}' http://mcc.gmh:8000/api
+```
+
+
+```bash
+curl --header "Content-Type: application/json"  --request POST --data '{"command": "status"}' http://mcc.gmh:8000/api
+
+```
+
