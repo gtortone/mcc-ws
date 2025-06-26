@@ -3,7 +3,7 @@
 
 ## Introduction
 
-MCC board JSON web service to allow web pages and HTTP clients to interact with MCC board
+MCC board JSON web service allows web pages and HTTP clients to interact with MCC board
 
 ## Description
 
