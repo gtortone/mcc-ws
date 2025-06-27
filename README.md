@@ -3,7 +3,10 @@
 
 ## Introduction
 
-MCC board JSON web service allows web pages and HTTP clients to interact with MCC board
+MCC board JSON web service allows web pages and HTTP clients to interact with MCC board.
+A web app is also available on port 8000 to monitor and manage MCC board.
+
+![images](imageFolder/screenshot.png)
 
 ## Description
 
