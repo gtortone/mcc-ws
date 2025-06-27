@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.realpath('/opt/mcc-board-cli'))
 from lib.MCCBoard import MCCBoard
 
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_json import FlaskJSON, JsonError, json_response, as_json
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
@@ -46,6 +46,22 @@ mcc = MCCBoard()
 
 app = Flask(__name__)
 FlaskJSON(app)
+
+@app.route("/")
+def send_homepage():
+   return send_from_directory('static', 'index.html')
+
+@app.route("/<path:path>")
+def send_static(path):
+   return send_from_directory('static', path)
+
+@app.route('/js/<path:path>')
+def send_js(path):
+    return send_from_directory('js', path)
+
+@app.route('/css/<path:path>')
+def send_css(path):
+    return send_from_directory('css', path)
 
 @app.route("/api", methods=["POST"])
 def handle_request():
@@ -97,6 +113,5 @@ def handle_request():
 
    return json_response(result=response)
       
-
 if __name__ == "__main__":
    app.run()
