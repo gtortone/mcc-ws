@@ -101,15 +101,11 @@ def handle_request():
       for p in range(0,8):
          response["ports"].append(mcc.sw.as_dict(p))
 
-      if mcc.sfp0.is_available():
-         d = {"id": 0}
-         d.update(mcc.sfp0.as_dict())
-         response["sfp"].append(d)
-
-      if mcc.sfp1.is_available():
-         d = {"id": 1}
-         d.update(mcc.sfp1.as_dict())
-         response["sfp"].append(d)
+      for i, el in enumerate(mcc.sfp):
+         if mcc.sfp[i].is_available():
+            d = {"id": i}
+            d.update(mcc.sfp[i].as_dict())
+            response["sfp"].append(d)
 
    return json_response(result=response)
       
