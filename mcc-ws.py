@@ -134,6 +134,8 @@ def handle_request():
       response["ports"] = []
       response["sfp"] = []
 
+      response["version"] = mcc.version
+
       for c in range(0,2):
          d = {"id": c}
          d.update(mcc.sw.poectrl[c].as_dict())
@@ -143,10 +145,10 @@ def handle_request():
          response["ports"].append(mcc.sw.as_dict(p))
 
       for i, el in enumerate(mcc.sfp):
-         if mcc.sfp[i].is_available():
-            d = {"id": i}
-            d.update(mcc.sfp[i].as_dict())
-            response["sfp"].append(d)
+         #if mcc.sfp[i].is_available():
+         d = {"id": i}
+         d.update(mcc.sfp[i].as_dict())
+         response["sfp"].append(d)
 
       if mcc.version == 2:
 
@@ -170,11 +172,13 @@ def handle_request():
             response["board"]["rails"].append(d)
 
          d = {}
+         d["label"] = "SHT40"
          d["temperature"] = round(mcc.sht40.read()[0], 2)
          d["humidity"] = round(mcc.sht40.read()[1], 2)
          response["board"]["sensors"].append(d)
 
          d = {}
+         d["label"] = "BMP585"
          d["temperature"] = round(mcc.bmp585.read()[0], 2)
          d["pressure"] = round(mcc.bmp585.read()[1]/100, 2)
          response["board"]["sensors"].append(d)

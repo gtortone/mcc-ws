@@ -6,17 +6,31 @@
     <title>MCC Control Panel</title>
     <link rel="shortcut icon" href="#">
     <link rel="stylesheet" href="/css/bulma.min.css">
+    <link rel="stylesheet" href="/css/switch.css">
   </head>
   <script>
+
     function powerPort(port, value) {
+
       if (value == 0) {
          var res = prompt(`Turning off port ${port} (y/n) ?`)
-         if (res.toLowerCase() != 'y')
-            return
+         if (res == null || res.toLowerCase() != 'y') {
+            return false
+         }
       }
+
+      const sw = document.getElementById(`sw-${port}-power`);
+
       fetch("/api", {
          method: "POST",
          body: JSON.stringify({ command: "power", "ports": [port], "value": value }),
+      })
+    }
+
+    function setPortOption(port, option, value) {
+      fetch("/api", {
+         method: "POST",
+         body: JSON.stringify({ command: "setoption", "ports": [port], "option": option, "value": value }),
       })
     }
 
@@ -31,10 +45,11 @@
          // RJ45 ports
          out.result.ports.forEach(function(p) {
             cells = table.rows[p.id+1].cells
-            if (p.status.toUpperCase() == 'ON')
+            if (p.status.toUpperCase() == 'ON') {
                cells[1].innerHTML = '<span class="tag is-success is-medium">ON</span>' 
-            else
+            } else {
                cells[1].innerHTML = '<span class="tag is-danger is-medium">OFF</span>'
+            }
             if (p.voltage > 0) 
                table.rows[p.id+1].style.backgroundColor = "lightgreen"
             else
@@ -48,19 +63,44 @@
                cells[7].innerHTML = `<button class="button is-danger is-rounded" onclick="powerPort(${p.id}, 0)">switch off</button>`
             else
                cells[7].innerHTML = `<button class="button is-success is-rounded" onclick="powerPort(${p.id}, 1)">switch on</button>`
+            if (p.options.keep_power == false)
+               cells[8].innerHTML = `<button class="button is-success is-rounded" onclick="setPortOption(${p.id}, 'keep_power', 1)">enable</button>`
+            else
+               cells[8].innerHTML = `<button class="button is-danger is-rounded" onclick="setPortOption(${p.id}, 'keep_power', 0)">disable</button>`
          });
          // SFP ports
-         sfpdown = new Array(0,1)
          out.result.sfp.forEach(function(p) {
             title = document.getElementById(`sfp${p.id}-title`)
-            title.classList.replace("is-danger", "is-success")
             block = document.getElementById(`sfp${p.id}-block`)
             block.classList.remove("is-hidden")
             table = document.getElementById(`sfp${p.id}-table`)
+            table.classList.remove("is-hidden")
             table.rows[0].cells[1].innerHTML = p.vendor
             table.rows[1].cells[1].innerHTML = p.model
             table.rows[2].cells[1].innerHTML = p.serial
             table.rows[3].cells[1].innerHTML = p.datecode
+            present_tag = document.getElementById(`sfp${p.id}-present`)
+            power_tag = document.getElementById(`sfp${p.id}-power`)
+            if (p.power.toLowerCase() == "on") {
+               power_tag.innerHTML = "on"
+               power_tag.classList.replace("is-danger", "is-success")
+               present_tag.classList.remove("is-hidden")
+            } else {
+               power_tag.innerHTML = "off"
+               power_tag.classList.replace("is-success", "is-danger")
+               present_tag.classList.add("is-hidden")
+            }
+            if (p.present == true) {
+               present_tag.innerHTML = "present"
+               present_tag.classList.replace("is-danger", "is-success")
+            } else {
+               present_tag.innerHTML = "not present"
+               present_tag.classList.replace("is-success", "is-danger")
+               block = document.getElementById(`sfp${p.id}-block`)
+               block.classList.add("is-hidden")
+               table = document.getElementById(`sfp${p.id}-table-ext`)
+               table.classList.add("is-hidden") 
+            }
             if ("voltage" in p) {
                table = document.getElementById(`sfp${p.id}-table-ext`)
                table.classList.remove("is-hidden")
@@ -70,17 +110,6 @@
                table.rows[3].cells[1].innerHTML = p.txpower
                table.rows[4].cells[1].innerHTML = p.rxpower
             }
-            // remove SFP from list of SFP down
-            sfpdown = sfpdown.filter(item => item !== p.id)
-         });
-         // mark down SFP
-         sfpdown.forEach(function(id) {
-            title = document.getElementById(`sfp${id}-title`)
-            title.classList.replace("is-success", "is-danger")
-            block = document.getElementById(`sfp${id}-block`)
-            block.classList.add("is-hidden")
-            table = document.getElementById(`sfp${id}-table-ext`)
-            table.classList.add("is-hidden")
          });
          // POE controllers
          table = document.getElementById("poe-table")
@@ -89,305 +118,213 @@
             cells[2].innerHTML = p.voltage
             cells[3].innerHTML = p.temperature
          });
+         // network interfaces
+         table = document.getElementById("intf-table")
+         out.result.host.network.forEach((p,i) => {
+            cells = table.rows[i+1].cells
+            cells[0].innerHTML = p.interface
+            cells[1].innerHTML = p.rx_speed
+            cells[2].innerHTML = p.tx_speed
+         });
+         // cpu
+         table = document.getElementById("cpu-table")
+         out.result.host.cpu.forEach((p,i) => {
+            cells = table.rows[i+1].cells
+            cells[0].innerHTML = i
+            cells[1].innerHTML = p.usage
+         });
+         // memory
+         table = document.getElementById("mem-table")
+         out.result.host.memory.forEach((p,i) => {
+            cells = table.rows[i+1].cells
+            cells[0].innerHTML = p.available
+            cells[1].innerHTML = p.total
+            cells[2].innerHTML = p.used
+            cells[3].innerHTML = p.available_p
+            cells[4].innerHTML = p.used_p
+         });
+         // FPGA
+         table = document.getElementById("fpga-table")
+         out.result.board.fpga.forEach((p, i) => {
+            table.rows[0].cells[1].innerHTML = p.version.release
+            table.rows[1].cells[1].innerHTML = p.version.build_date
+            table.rows[2].cells[1].innerHTML = p.version.build_time
+            table.rows[3].cells[1].innerHTML = p.version.commit_date
+            table.rows[4].cells[1].innerHTML = p.version.commit_hash
+         });
+         if (out.result.version == 1) {
+            document.getElementById("rails-main").classList.add("is-hidden")
+            document.getElementById("env-main").classList.add("is-hidden")
+            document.getElementById("sfp2-main").classList.add("is-hidden")
+         } else {
+            // rails 
+            table = document.getElementById("rails-table")
+            out.result.board.rails.forEach((p, i) => {
+               cells = table.rows[i+1].cells
+               cells[0].innerHTML = p.label
+               cells[1].innerHTML = p.voltage
+               cells[2].innerHTML = p.current
+               cells[3].innerHTML = p.power
+            });
+            // environment
+            table = document.getElementById("env-table")
+            out.result.board.sensors.forEach((p, i) => {
+               cells = table.rows[i+1].cells
+               cells[0].innerHTML = p.label
+               cells[1].innerHTML = p.temperature
+               if (p.humidity)
+                  cells[2].innerHTML = p.humidity
+               if (p.pressure)
+                  cells[3].innerHTML = p.pressure
+            });
+         }
       })
 
       setTimeout(updatePortsTable, 3000)
     };
 
-    updatePortsTable()
+    updatePortsTable();
 
   </script>
   <body>
   <section class="section">
     <div class="container">
+
       <div class="block">
          <div class="notification is-primary is-light is-size-3">
            <b>MCC Control Panel</b>
          </div>
       </div>
-      <div class="block">
-         <div class="notification is-success is-light is-size-4">
-           RJ45 ports
-         </div>
+
+      <!-- TABS HEADER -->
+      <div class="tabs is-boxed is-centered is-toggle is-fullwidth" id="main-tabs">
+         <ul>
+            <li class="is-active is-size-5" data-tab="poe"><a>POE</a></li>
+            <li class="is-size-5" data-tab="host"><a>Host</a></li>
+            <li class="is-size-5" data-tab="board"><a>Board</a></li>
+         </ul>
       </div>
-      <div class="columns is-centered">
-         <div class="column is-four-fifths">
-            <table id="ports-table" class="table is-size-5">
-               <thead>
-                  <tr>
-                     <th>Port #</th>
-                     <th>POE status</th>
-                     <th>Class</th>
-                     <th>Detection</th>
-                     <th>Voltage (V)</th>
-                     <th>Current (mA)</th>
-                     <th>Power (W)</th>
-                     <th>POE</th>
-                  </tr>
-               </thead>
-               <tbody>
-                  <tr>
-                     <td class="has-text-centered">0</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">1</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">2</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">3</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">4</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">5</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">6</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-                  <tr>
-                     <td class="has-text-centered">7</td>
-                     <td class="has-text-centered"></td>
-                     <td></td>
-                     <td></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td class="has-text-right"></td>
-                     <td></td>
-                  </tr>
-               </tbody>
-            </table>
-         </div>   <!-- end column -->
-      </div>  <!-- end columns --> 
-      <div class="block">
-         <div class="notification is-success is-light is-size-4">
-           SFP ports
+
+      <!-- TAB POE -->
+      <div class="tab-content is-active" data-content="poe">
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              RJ45 ports
+            </div>
          </div>
-      </div>
-      <div class="columns">
-         <div class="column">
-            <div id="sfp0-title" class="notification is-danger is-size-5">
-              SFP #0
+         <div class="columns">
+            <div class="column is-centered">
+               <table id="ports-table" class="table is-fullwidth is-size-5">
+                  <thead>
+                     <tr>
+                        <th class="has-text-centered">Port #</th>
+                        <th class="has-text-centered">POE status</th>
+                        <th>Class</th>
+                        <th>Detection</th>
+                        <th class="has-text-right">Voltage (V)</th>
+                        <th class="has-text-right">Current (mA)</th>
+                        <th class="has-text-right">Power (W)</th>
+                        <th>POE</th>
+                        <th>keep power</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     <tr>
+                        <td class="has-text-centered">0</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">1</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">2</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">3</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">4</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">5</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">6</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered">7</td>
+                        <td class="has-text-centered"></td>
+                        <td></td>
+                        <td></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td></td>
+                        <td></td>
+                     </tr>
+                  </tbody>
+               </table>
+            </div>   <!-- end column -->
+         </div>  <!-- end columns --> 
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+               POE controllers 
             </div>
-            <div id="sfp0-block" class="block">
-               <div class="columns">
-                  <div class="column">
-                     <table id="sfp0-table" class="table is-size-5">
-                        <tbody>
-                           <tr>
-                              <td>
-                                 <b>vendor</b>
-                              </td>
-                              <td>
-                              </td>
-                           <tr>
-                              <td>
-                                 <b>model</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>serial</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>datecode</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           </tr>
-                        </tbody>
-                     </table>
-                  </div>   <!-- end column -->
-                  <div class="column">
-                     <table id="sfp0-table-ext" class="table is-size-5 is-hidden">
-                        <tbody>
-                           <tr>
-                              <td>
-                                 <b>voltage (V)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>temperature (°C)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           <tr>
-                              <td>
-                                 <b>TX bias (mA)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>TX power (uW)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>RX power (uW)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           </tr>
-                        </tbody>
-                     </table>
-                  </div>   <!-- end column -->
-               </div>   <!-- end columns inside SFP0 -->
-            </div>   <!-- end block -->
-         </div> <!-- end column of SFP0 -->
-         <div class="column">
-            <div id="sfp1-title" class="notification is-danger is-size-5">
-              SFP #1
-            </div>
-            <div id="sfp1-block" class="block">
-               <div class="columns">
-                  <div class="column">
-                     <table id="sfp1-table" class="table is-size-5">
-                        <tbody>
-                           <tr>
-                              <td>
-                                 <b>vendor</b>
-                              </td>
-                              <td>
-                              </td>
-                           <tr>
-                              <td>
-                                 <b>model</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>serial</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>datecode</b>
-                              </td>
-                              <td>
-                              </td>
-                           </tr>
-                           </tr>
-                        </tbody>
-                     </table>
-                  </div>   <!-- end column -->
-                  <div class="column">
-                     <table id="sfp1-table-ext" class="table is-size-5 is-hidden">
-                        <tbody>
-                           <tr>
-                              <td>
-                                 <b>voltage (V)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>temperature (°C)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           <tr>
-                              <td>
-                                 <b>TX bias (mA)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>TX power (uW)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           <tr>
-                              <td>
-                                 <b>RX power (uW)</b>
-                              </td>
-                              <td class="has-text-right">
-                              </td>
-                           </tr>
-                           </tr>
-                        </tbody>
-                     </table>
-                  </div>   <!-- end column -->
-               </div>   <!-- end columns inside SFP1 -->
-            </div>   <!-- end block -->
-         </div> <!-- end column of SFP1 -->
-      </div> <!-- end columns -->
-      <div class="block">
-         <div class="notification is-success is-light is-size-4">
-            POE controllers 
          </div>
          <div class="columns is-centered">
             <div class="column is-two-fifths">
@@ -421,8 +358,573 @@
                </table>
             </div>   <!-- end column -->
          </div>   <!-- end columns -->
-      </div>
-    </div>
+      </div> <!-- end tab POE -->
+
+      <!-- TAB HOST -->
+      <div class="tab-content is-hidden" data-content="host">
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              Network interfaces
+            </div>
+         </div>
+         <div class="columns">
+            <div class="column is-10 is-offset-1">
+               <table id="intf-table" class="table is-fullwidth is-striped is-size-5">
+                  <thead>
+                     <tr>
+                        <th class="has-text-centered">Interface</th>
+                        <th class="has-text-right">RX (Mbit/s)</th>
+                        <th class="has-text-right">TX (Mbit/s)</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td class="has-text-centered"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                  </tbody>
+               </table>
+            </div>   <!-- end column -->
+         </div>  <!-- end columns --> 
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              CPU 
+            </div>
+         </div>
+         <div class="columns is-centered">
+            <div class="column is-3">
+               <table id="cpu-table" class="table is-size-5">
+                  <thead>
+                     <tr>
+                        <th>id</th>
+                        <th>usage (%)</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     <tr>
+                        <td>0</td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                     <tr>
+                        <td>1</td>
+                        <td class="has-text-right"></td>
+                        </td>
+                     </tr>
+                  </tbody>
+               </table>
+            </div>   <!-- end column -->
+         </div>   <!-- end columns -->
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              Memory 
+            </div>
+         </div>
+         <div class="columns is-centered">
+            <div class="column is-6">
+               <table id="mem-table" class="table is-size-5">
+                  <thead>
+                     <tr>
+                        <th>available (MB)</th>
+                        <th>total (MB)</th>
+                        <th>used (MB)</th>
+                        <th>available (%)</th>
+                        <th>used (%)</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     <tr>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                        <td class="has-text-right"></td>
+                     </tr>
+                  </tbody>
+               </table>
+            </div>   <!-- end column -->
+         </div>   <!-- end columns -->
+      </div> <!-- end tab HOST -->
+
+      <!-- TAB BOARD -->
+      <div class="tab-content is-hidden" data-content="board">
+         <div id="rails-main" class="block is-11">
+            <div class="notification is-success is-light is-size-4">
+              Rails
+            </div>
+            <div class="columns">
+               <div class="column is-10 is-offset-1">
+                  <table id="rails-table" class="table is-fullwidth is-striped is-size-5">
+                     <thead>
+                        <tr>
+                           <th class="has-text-centered">rail</th>
+                           <th class="has-text-right">voltage (V)</th>
+                           <th class="has-text-right">current (mA)</th>
+                           <th class="has-text-right">power (W)</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>   <!-- end column -->
+            </div>  <!-- end columns --> 
+         </div>
+         <div id="env-main" class="block is-11">
+            <div class="notification is-success is-light is-size-4">
+              Environment
+            </div>
+            <div class="columns">
+               <div class="column is-10 is-offset-1">
+                  <table id="env-table" class="table is-fullwidth is-size-5">
+                     <thead>
+                        <tr>
+                           <th class="has-text-centered">sensor</th>
+                           <th class="has-text-right">temperature (°C)</th>
+                           <th class="has-text-right">humidity (%Rh)</th>
+                           <th class="has-text-right">pressure (mbar)</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                        <tr>
+                           <td class="has-text-centered"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                           <td class="has-text-right"></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>   <!-- end column -->
+            </div>  <!-- end columns --> 
+         </div>
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              SFP ports
+            </div>
+         </div>
+         <div class="columns">
+            <div class="column">
+               <div id="sfp0-title" class="notification is-size-5">
+                 <span>SFP #0</span>
+                 <span id="sfp0-present" class="tag is-danger"></span>
+                 <span id="sfp0-power" class="tag is-danger"></span>
+               </div>
+               <div id="sfp0-block" class="block">
+                  <div class="columns">
+                     <div class="column">
+                        <table id="sfp0-table" class="table is-size-6">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>vendor</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>model</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>serial</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>datecode</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                     <div class="column">
+                        <table id="sfp0-table-ext" class="table is-size-6 is-hidden">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>voltage (V)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>temperature (°C)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>TX bias (mA)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>TX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>RX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                  </div>   <!-- end columns inside SFP0 -->
+               </div>   <!-- end block -->
+            </div> <!-- end column of SFP0 -->
+            <div class="column">
+               <div id="sfp1-title" class="notification is-size-5">
+                 <span>SFP #1</span>
+                 <span id="sfp1-present" class="tag is-danger"></span>
+                 <span id="sfp1-power" class="tag is-danger"></span>
+               </div>
+               <div id="sfp1-block" class="block">
+                  <div class="columns">
+                     <div class="column">
+                        <table id="sfp1-table" class="table is-size-6 is-hidden">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>vendor</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>model</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>serial</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>datecode</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                     <div class="column">
+                        <table id="sfp1-table-ext" class="table is-size-6 is-hidden">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>voltage (V)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>temperature (°C)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>TX bias (mA)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>TX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>RX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                  </div>   <!-- end columns inside SFP1 -->
+               </div>   <!-- end block -->
+            </div> <!-- end column of SFP1 -->
+            <div class="column" id="sfp2-main">
+               <div id="sfp2-title" class="notification is-size-5">
+                 <span>SFP #2</span>
+                 <span id="sfp2-present" class="tag is-danger"></span>
+                 <span id="sfp2-power" class="tag is-danger"></span>
+               </div>
+               <div id="sfp2-block" class="block">
+                  <div class="columns">
+                     <div class="column">
+                        <table id="sfp2-table" class="table is-size-6 is-hidden">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>vendor</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>model</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>serial</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>datecode</b>
+                                 </td>
+                                 <td>
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                     <div class="column">
+                        <table id="sfp2-table-ext" class="table is-size-6 is-hidden">
+                           <tbody>
+                              <tr>
+                                 <td>
+                                    <b>voltage (V)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>temperature (°C)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              <tr>
+                                 <td>
+                                    <b>TX bias (mA)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>TX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td>
+                                    <b>RX power (uW)</b>
+                                 </td>
+                                 <td class="has-text-right">
+                                 </td>
+                              </tr>
+                              </tr>
+                           </tbody>
+                        </table>
+                     </div>   <!-- end column -->
+                  </div>   <!-- end columns inside SFP1 -->
+               </div>   <!-- end block -->
+            </div> <!-- end column of SFP1 -->
+         </div> <!-- end columns -->
+         <div class="block">
+            <div class="notification is-success is-light is-size-4">
+              FPGA 
+            </div>
+         </div>
+         <div class="columns is-centered">
+            <div class="column is-two-fifths">
+               <table id="fpga-table" class="table is-size-5">
+                  <tbody>
+                     <tr>
+                        <td>
+                           <b>release</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     </tr>
+                     <tr>
+                        <td>
+                           <b>build date</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     <tr>
+                        <td>
+                           <b>build time</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     </tr>
+                     <tr>
+                        <td>
+                           <b>commit date</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     </tr>
+                     <tr>
+                        <td>
+                           <b>commit hash</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     </tr>
+                     </tr>
+                  </tbody>
+               </table>
+            </div>   <!-- end column -->
+         </div> <!-- end columns -->
+      </div> <!-- end tab BOARD-->
+
+    </div>  <!-- end container -->
   </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('#main-tabs li');
+      const contents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('is-active'));
+          tab.classList.add('is-active');
+
+          const target = tab.dataset.tab;
+          contents.forEach(c => {
+            if (c.dataset.content === target) {
+              c.classList.add('is-active');
+            } else {
+              c.classList.remove('is-active');
+            }
+            c.classList.add('is-hidden');
+            if (c.dataset.content === target) {
+              c.classList.remove('is-hidden');
+            }
+          });
+        });
+      });
+    });
+  </script>
   </body>
 </html>
