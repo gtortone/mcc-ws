@@ -14,7 +14,7 @@ schema = {
     "type": "object",
     "properties": {
         "command": {
-            "enum": ["power", "status"]
+            "enum": ["power", "status", "setoption"]
         },
     },
 
@@ -39,6 +39,32 @@ schema = {
          }
       },
       "required": ["ports", "value"],
+    },
+
+    "if": {
+      "properties": {
+         "command": { "const": "setoption" }
+      }
+    },
+    "then": {
+      "properties": {
+         "option": {
+            "type": "string",
+            "enum": ["keep_power"], 
+            "minItems": 1,
+         },
+         "ports": {
+            "type": "array",
+            "items": {"type": "number", "minimum": 0, "maximum": 7},
+            "minItems": 1,
+         },
+         "value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1, 
+         }
+      },
+      "required": ["option", "ports", "value"],
     },
 }
 
@@ -86,6 +112,21 @@ def handle_request():
             "id": p, 
             "status": 'on' if mcc.sw.port_status(p) else 'off' 
          })
+
+   if cmd == "setoption":
+      response = {}
+      response["ports"] = []
+      if data["option"] == "keep_power":
+         for p in data["ports"]:
+            if data["value"] == 0:
+               mcc.sw.port_set_keep_power(p, False)
+            else:
+               mcc.sw.port_set_keep_power(p, True)
+            response["ports"].append({
+               "id": p,
+               "option": data["option"],
+               "value": data["value"]
+            })
          
    if cmd == "status":
       response = {}
@@ -106,6 +147,62 @@ def handle_request():
             d = {"id": i}
             d.update(mcc.sfp[i].as_dict())
             response["sfp"].append(d)
+
+      if mcc.version == 2:
+
+         response["board"] = {}
+         response["board"]["rails"] = []
+         response["board"]["sensors"] = []
+         response["board"]["fpga"] = []
+         response["host"] = {}
+         response["host"]["cpu"] = []
+         response["host"]["memory"] = []
+         response["host"]["network"] = []
+
+         for i, el in enumerate(mcc.boardmon):
+            d = {}
+            d = el.as_dict()
+            response["board"]["rails"].append(d)
+
+         for i, el in enumerate(mcc.sfpmon):
+            d = {}
+            d = el.as_dict()
+            response["board"]["rails"].append(d)
+
+         d = {}
+         d["temperature"] = round(mcc.sht40.read()[0], 2)
+         d["humidity"] = round(mcc.sht40.read()[1], 2)
+         response["board"]["sensors"].append(d)
+
+         d = {}
+         d["temperature"] = round(mcc.bmp585.read()[0], 2)
+         d["pressure"] = round(mcc.bmp585.read()[1]/100, 2)
+         response["board"]["sensors"].append(d)
+
+         d = {}
+         d["version"] = mcc.fpga.bitstream_version()
+         response["board"]["fpga"].append(d) 
+
+         for i, value in enumerate(mcc.host.get_cpu_status()):
+            d = {}
+            d["usage"] = value
+            response["host"]["cpu"].append(d)
+
+         mem = mcc.host.get_memory_status()
+         d = {}
+         d["total"] = round(mem.total / 1e6, 0)
+         d["available"] = round(mem.available / 1e6, 0)
+         d["available_p"] = round(mem.available/mem.total*100, 2)
+         d["used"] = round(mem.used/ 1e6, 0)
+         d["used_p"] = round(mem.used/mem.total*100, 2)
+         response["host"]["memory"].append(d)
+
+         for intf, el in mcc.host.get_network_status().items():
+            d = {}
+            d["interface"] = intf
+            d["rx_speed"] = el["rx_speed"]
+            d["tx_speed"] = el["tx_speed"]
+            response["host"]["network"].append(d)
 
    return json_response(result=response)
       
