@@ -180,6 +180,8 @@ def handle_request():
          d["interface"] = intf
          d["rx_speed"] = el["rx_speed"]
          d["tx_speed"] = el["tx_speed"]
+         d["mac"] = el["mac"]
+         d["ip"] = el["ip"]
          response["host"]["network"].append(d)
 
       if mcc.version == 2:
