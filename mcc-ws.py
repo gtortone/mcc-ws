@@ -150,16 +150,42 @@ def handle_request():
          d.update(mcc.sfp[i].as_dict())
          response["sfp"].append(d)
 
+      response["host"] = {}
+      response["host"]["cpu"] = []
+      response["host"]["memory"] = []
+      response["host"]["network"] = []
+      response["board"] = {}
+      response["board"]["fpga"] = []
+
+      d = {}
+      d["version"] = mcc.fpga.bitstream_version()
+      response["board"]["fpga"].append(d) 
+
+      for i, value in enumerate(mcc.host.get_cpu_status()):
+         d = {}
+         d["usage"] = value
+         response["host"]["cpu"].append(d)
+
+      mem = mcc.host.get_memory_status()
+      d = {}
+      d["total"] = round(mem.total / 1e6, 0)
+      d["available"] = round(mem.available / 1e6, 0)
+      d["available_p"] = round(mem.available/mem.total*100, 2)
+      d["used"] = round(mem.used/ 1e6, 0)
+      d["used_p"] = round(mem.used/mem.total*100, 2)
+      response["host"]["memory"].append(d)
+
+      for intf, el in mcc.host.get_network_status().items():
+         d = {}
+         d["interface"] = intf
+         d["rx_speed"] = el["rx_speed"]
+         d["tx_speed"] = el["tx_speed"]
+         response["host"]["network"].append(d)
+
       if mcc.version == 2:
 
-         response["board"] = {}
          response["board"]["rails"] = []
          response["board"]["sensors"] = []
-         response["board"]["fpga"] = []
-         response["host"] = {}
-         response["host"]["cpu"] = []
-         response["host"]["memory"] = []
-         response["host"]["network"] = []
 
          for i, el in enumerate(mcc.boardmon):
             d = {}
@@ -183,30 +209,6 @@ def handle_request():
          d["pressure"] = round(mcc.bmp585.read()[1]/100, 2)
          response["board"]["sensors"].append(d)
 
-         d = {}
-         d["version"] = mcc.fpga.bitstream_version()
-         response["board"]["fpga"].append(d) 
-
-         for i, value in enumerate(mcc.host.get_cpu_status()):
-            d = {}
-            d["usage"] = value
-            response["host"]["cpu"].append(d)
-
-         mem = mcc.host.get_memory_status()
-         d = {}
-         d["total"] = round(mem.total / 1e6, 0)
-         d["available"] = round(mem.available / 1e6, 0)
-         d["available_p"] = round(mem.available/mem.total*100, 2)
-         d["used"] = round(mem.used/ 1e6, 0)
-         d["used_p"] = round(mem.used/mem.total*100, 2)
-         response["host"]["memory"].append(d)
-
-         for intf, el in mcc.host.get_network_status().items():
-            d = {}
-            d["interface"] = intf
-            d["rx_speed"] = el["rx_speed"]
-            d["tx_speed"] = el["tx_speed"]
-            response["host"]["network"].append(d)
 
    return json_response(result=response)
       
