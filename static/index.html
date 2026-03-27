@@ -148,11 +148,12 @@
          // FPGA
          table = document.getElementById("fpga-table")
          out.result.board.fpga.forEach((p, i) => {
-            table.rows[0].cells[1].innerHTML = p.version.release
-            table.rows[1].cells[1].innerHTML = p.version.build_date
-            table.rows[2].cells[1].innerHTML = p.version.build_time
-            table.rows[3].cells[1].innerHTML = p.version.commit_date
-            table.rows[4].cells[1].innerHTML = p.version.commit_hash
+            table.rows[0].cells[1].innerHTML = p.version.variant
+            table.rows[1].cells[1].innerHTML = p.version.release
+            table.rows[2].cells[1].innerHTML = p.version.build_date
+            table.rows[3].cells[1].innerHTML = p.version.build_time
+            table.rows[4].cells[1].innerHTML = p.version.commit_date
+            table.rows[5].cells[1].innerHTML = p.version.commit_hash
          });
          if (out.result.version == 1) {
             document.getElementById("rails-main").classList.add("is-hidden")
@@ -880,6 +881,13 @@
             <div class="column is-two-fifths">
                <table id="fpga-table" class="table is-size-5">
                   <tbody>
+                     <tr>
+                        <td>
+                           <b>variant</b>
+                        </td>
+                        <td class="has-text-right">
+                        </td>
+                     </tr>
                      <tr>
                         <td>
                            <b>release</b>
