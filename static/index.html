@@ -6,7 +6,6 @@
     <title>MCC Control Panel</title>
     <link rel="shortcut icon" href="#">
     <link rel="stylesheet" href="/css/bulma.min.css">
-    <link rel="stylesheet" href="/css/switch.css">
   </head>
   <script>
 
@@ -156,10 +155,17 @@
             table.rows[5].cells[1].innerHTML = p.version.commit_hash
          });
          if (out.result.version == 1) {
+            document.getElementById("timing-main").classList.add("is-hidden")
             document.getElementById("rails-main").classList.add("is-hidden")
             document.getElementById("env-main").classList.add("is-hidden")
             document.getElementById("sfp2-main").classList.add("is-hidden")
          } else {
+            // timing
+            table = document.getElementById("timing-table")
+            p = out.result.board.timing
+            table.rows[0].cells[1].innerHTML = p.mcc_mcc_locked
+            table.rows[1].cells[1].innerHTML = p.pll_locked
+            table.rows[2].cells[1].innerHTML = p.tdm_mcc_locked
             // rails 
             table = document.getElementById("rails-table")
             out.result.board.rails.forEach((p, i) => {
@@ -523,6 +529,39 @@
 
       <!-- TAB BOARD -->
       <div class="tab-content is-hidden" data-content="board">
+         <div id="timing-main" class="block is-11">
+            <div class="notification is-success is-light is-size-4">
+              Timing  
+            </div>
+            <div class="columns is-centered">
+               <div class="column is-two-fifths">
+                  <table id="timing-table" class="table is-size-5">
+                     <tbody>
+                        <tr>
+                           <td>
+                              <b>MCC-MCC timing link locked</b>
+                           </td>
+                           <td class="has-text-right">
+                           </td>
+                        </tr>
+                        <tr>
+                           <td>
+                              <b>Si5345 PLL locked</b>
+                           </td>
+                           <td class="has-text-right">
+                           </td>
+                        </tr>
+                        <tr>
+                           <td>
+                              <b>TDM-MCC timing link locked</b>
+                           </td>
+                           <td class="has-text-right">
+                           </td>
+                     </tbody>
+                  </table>
+               </div>   <!-- end column -->
+            </div> <!-- end columns -->
+         </div>
          <div id="rails-main" class="block is-11">
             <div class="notification is-success is-light is-size-4">
               Rails
@@ -868,9 +907,9 @@
                            </tbody>
                         </table>
                      </div>   <!-- end column -->
-                  </div>   <!-- end columns inside SFP1 -->
+                  </div>   <!-- end columns inside SFP2 -->
                </div>   <!-- end block -->
-            </div> <!-- end column of SFP1 -->
+            </div> <!-- end column of SFP2 -->
          </div> <!-- end columns -->
          <div class="block">
             <div class="notification is-success is-light is-size-4">

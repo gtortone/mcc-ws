@@ -211,6 +211,7 @@ def handle_request():
          d["pressure"] = round(mcc.bmp585.read()[1]/100, 2)
          response["board"]["sensors"].append(d)
 
+         response["board"]["timing"] = mcc.fpga.get_timing_status(True)
 
    return json_response(result=response)
       
